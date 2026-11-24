@@ -1,0 +1,38 @@
+services:
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: focus
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
+    volumes: [mongodata:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      retries: 10
+
+  backend:
+    image: ${DOCKERHUB_USER:-dockerienesgi}/focustask-backend:${TAG:-latest}
+    build: ./app/backend
+    environment:
+      MONGO_URI: mongodb://focus:${DB_PASSWORD}@mongo:27017/focustask?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  frontend:
+    image: ${DOCKERHUB_USER:-dockerienesgi}/focustask-frontend:${TAG:-latest}
+    build: ./app/frontend
+    ports: ["80:80"]
+    depends_on: [backend]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    ports: ["8080:8080"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+volumes:
+  mongodata: {}
